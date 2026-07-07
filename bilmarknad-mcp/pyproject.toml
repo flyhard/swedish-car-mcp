@@ -1,0 +1,46 @@
+[project]
+name = "bilmarknad-mcp"
+version = "0.1.0"
+description = "MCP server for Swedish used car search (Blocket, Wayke, KVD)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "flyhard" }]
+keywords = ["mcp", "blocket", "wayke", "cars", "sweden"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "mcp>=1.6",
+    "httpx>=0.27",
+]
+
+[project.urls]
+Homepage = "https://github.com/flyhard/swedish-car-mcp"
+Repository = "https://github.com/flyhard/swedish-car-mcp"
+Issues = "https://github.com/flyhard/swedish-car-mcp/issues"
+
+[project.scripts]
+bilmarknad-mcp = "bilmarknad_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-httpx>=0.30"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bilmarknad_mcp"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.uv]
+package = true
