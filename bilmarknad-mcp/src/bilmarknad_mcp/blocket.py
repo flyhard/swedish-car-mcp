@@ -6,8 +6,10 @@ from typing import Any
 import httpx
 
 from bilmarknad_mcp.schema import CarListing
+from bilmarknad_mcp.soh import apply_soh
 
 BLOCKET_SEARCH_URL = "https://www.blocket.se/mobility/search/api/search/SEARCH_ID_CAR_USED"
+BLOCKET_DETAIL_URL = "https://blocket-api.se/v1/ad/car"
 
 
 def pick(key, mapping, default=None):
@@ -102,7 +104,7 @@ def parse_ad(p):
     if ts:
         published = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).isoformat()
     listing_id = str(pick("ad_id", p) or pick("id", p) or "")
-    return CarListing(
+    listing = CarListing(
         source="blocket",
         id=listing_id,
         title=pick("heading", p) or pick("facade_title", p) or "",
@@ -122,6 +124,49 @@ def parse_ad(p):
         raw=p,
     )
 
+    extras = pick("extras", p, [])
+    labels = pick("labels", p, [])
+    extra_texts = [str(x) for x in extras] if isinstance(extras, list) else []
+    label_texts = [str(x) for x in labels] if isinstance(labels, list) else []
+
+    apply_soh(
+        listing,
+        pick("model_specification", p),
+        pick("heading", p),
+        *extra_texts,
+        *label_texts,
+        source="blocket_search",
+    )
+    return listing
+
+
+def fetch_blocket_detail(client, listing_id):
+    response = client.get(BLOCKET_DETAIL_URL, params={"id": listing_id})
+    response.raise_for_status()
+    return response.json()
+
+def enrich_listing_with_detail(listing, client):
+    if not listing.id:
+        return listing
+    try:
+        detail = fetch_blocket_detail(client, listing.id)
+    except Exception:
+        return listing
+    equipment = detail.get("equipment") or []
+    equip_texts = []
+    for item in equipment:
+        if isinstance(item, dict):
+            equip_texts.append(str(item.get("name") or item.get("label") or item))
+        else:
+            equip_texts.append(str(item))
+    apply_soh(
+        listing,
+        detail.get("subtitle"),
+        *equip_texts,
+        source="blocket_detail",
+    )
+    listing.raw = {**listing.raw, "detail": detail}
+    return listing
 class BlocketClient:
     def __init__(self, client=None):
         self._client = client
@@ -143,7 +188,7 @@ class BlocketClient:
     def get_listing(self, listing_id):
         for item in self.search(q=listing_id, rows=60):
             if item.id is not None and str(item.id) == str(listing_id):
-                return item
+                return enrich_listing_with_detail(item, self._get_client())
         return None
 
     def close(self):

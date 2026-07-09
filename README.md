@@ -6,7 +6,7 @@ MCP servers for Swedish used EV / car buying workflows in Cursor and other MCP h
 
 | Package | Description | Install |
 |---------|-------------|---------|
-| [bilmarknad-mcp](./bilmarknad-mcp/) | Search Blocket, Wayke, and KVD for used cars | `uvx --from git+https://github.com/flyhard/swedish-car-mcp bilmarknad-mcp` |
+| [bilmarknad-mcp](./bilmarknad-mcp/) | Search Blocket, Wayke, Tradera, and KVD for used cars | `uvx --from git+https://github.com/flyhard/swedish-car-mcp bilmarknad-mcp` |
 | [aviloo-mcp](./aviloo-mcp/) | Parse AVILOO battery certificate PDFs in a project repo | `uvx --from git+https://github.com/flyhard/swedish-car-mcp aviloo-mcp` |
 
 Pin a release with `@v0.1.0` on the git URL.
@@ -48,4 +48,4 @@ cd ../aviloo-mcp && uv sync && uv run pytest -q
 
 ## License
 
-MIT — see [LICENSE](./LICENSE). Third-party marketplace APIs (Blocket, Wayke, KVD) have their own terms; this project is unofficial and not affiliated with those services.
+MIT — see [LICENSE](./LICENSE). Third-party marketplace APIs (Blocket, Wayke, Tradera, KVD) have their own terms; this project is unofficial and not affiliated with those services.

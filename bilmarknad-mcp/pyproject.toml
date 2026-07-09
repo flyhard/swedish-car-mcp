@@ -1,12 +1,12 @@
 [project]
 name = "bilmarknad-mcp"
-version = "0.1.0"
-description = "MCP server for Swedish used car search (Blocket, Wayke, KVD)"
+version = "0.2.0"
+description = "MCP server for Swedish used car search (Blocket, Wayke, Tradera, KVD)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "flyhard" }]
-keywords = ["mcp", "blocket", "wayke", "cars", "sweden"]
+keywords = ["mcp", "blocket", "wayke", "tradera", "cars", "sweden"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",

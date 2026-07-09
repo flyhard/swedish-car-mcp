@@ -22,6 +22,10 @@ class CarListing:
     image_url: str | None = None
     published_at: str | None = None
     registration_number: str | None = None
+    soh_percent: float | None = None
+    battery_tested: bool = False
+    soh_source: str | None = None
+    soh_raw_match: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

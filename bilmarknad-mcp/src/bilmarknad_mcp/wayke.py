@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 
 from bilmarknad_mcp.schema import CarListing
+from bilmarknad_mcp.soh import apply_soh
 
 WAYKE_REST = "https://api.wayke.se/vehicles"
 WAYKE_GQL = "https://gql.wayke.se/query"
@@ -15,6 +16,7 @@ query SearchVehicles($search: String, $skip: Int, $take: Int) {
   vehicles(search: $search, skip: $skip, take: $take) {
     id
     title
+    shortDescription
     manufacturer { name }
     modelSeries { name }
     modelYear
@@ -32,6 +34,34 @@ query SearchVehicles($search: String, $skip: Int, $take: Int) {
 }
 """
 
+GQL_VEHICLE = """
+query GetVehicle($id: String!) {
+  vehicle(id: $id) {
+    id
+    title
+    shortDescription
+    description
+    manufacturer { name }
+    modelSeries { name }
+    modelYear
+    mileage
+    price
+    fuelType
+    gearbox
+    city
+    organization { name }
+    url
+    image { url }
+    registrationNumber
+    published
+    data {
+      properties
+      options
+    }
+  }
+}
+"""
+
 
 def _parse_vehicle(item: dict[str, Any]) -> CarListing:
     manufacturer = item.get("manufacturer") or {}
@@ -40,7 +70,7 @@ def _parse_vehicle(item: dict[str, Any]) -> CarListing:
     image = item.get("image") or {}
     mileage = item.get("mileage")
     price = item.get("price")
-    return CarListing(
+    listing = CarListing(
         source="wayke",
         id=str(item.get("id") or ""),
         title=item.get("title") or "",
@@ -59,6 +89,31 @@ def _parse_vehicle(item: dict[str, Any]) -> CarListing:
         registration_number=item.get("registrationNumber"),
         raw=item,
     )
+    apply_soh(listing, item.get("title"), item.get("shortDescription"), source="wayke_search")
+    return listing
+
+def _soh_detail_fields(item):
+    fields = [item.get("description"), item.get("shortDescription")]
+    data = item.get("data") or {}
+    props = data.get("properties") or []
+    opts = data.get("options") or []
+    for coll in (props, opts):
+        if isinstance(coll, list):
+            for entry in coll:
+                if isinstance(entry, dict):
+                    fields.append(str(entry.get("name") or entry.get("label") or entry.get("value") or ""))
+                else:
+                    fields.append(str(entry))
+        elif isinstance(coll, dict):
+            for k, v in coll.items():
+                fields.append(f"{k}: {v}")
+    return [f for f in fields if f]
+
+
+def _enrich_vehicle_soh(listing, item):
+    apply_soh(listing, *_soh_detail_fields(item), source="wayke_detail")
+    listing.raw = {**listing.raw, "detail": item}
+    return listing
 
 
 class WaykeClient:
@@ -111,6 +166,29 @@ class WaykeClient:
         data = response.json()
         vehicles = (((data.get("data") or {}).get("vehicles")) or [])
         return [_parse_vehicle(item) for item in vehicles]
+
+
+    def get_vehicle(self, vehicle_id: str) -> CarListing | None:
+        client = self._get_client()
+        if self._api_key:
+            response = client.get(f"{WAYKE_REST}/{vehicle_id}", headers={"Authorization": f"Bearer {self._api_key}"})
+            if response.status_code == 200:
+                item = response.json()
+                listing = _parse_vehicle(item)
+                return _enrich_vehicle_soh(listing, item)
+        response = client.post(
+            WAYKE_GQL,
+            json={"query": GQL_VEHICLE, "variables": {"id": vehicle_id}},
+            headers={"Content-Type": "application/json"},
+        )
+        if response.status_code >= 400:
+            return None
+        data = response.json()
+        item = ((data.get("data") or {}).get("vehicle"))
+        if not item:
+            return None
+        listing = _parse_vehicle(item)
+        return _enrich_vehicle_soh(listing, item)
 
     def close(self):
         if self._owns and self._client is not None:

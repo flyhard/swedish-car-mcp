@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 _BLOCKET_ITEM = re.compile(r"/mobility/item/(?P<id>\d+)", re.I)
 _WAYKE_VEHICLE = re.compile(r"/(?:vehicle|fordon|bilar)/(?P<id>[^/?#]+)", re.I)
 _KVD_OBJECT = re.compile(r"/(?:objekt|vehicle|bil|auktion)/(?P<id>\d+)", re.I)
+_TRADERA_ITEM = re.compile(r"/item/(?P<id>\d+)", re.I)
 
 
 def parse_listing_url(url: str) -> tuple[str, str] | None:
@@ -31,5 +32,10 @@ def parse_listing_url(url: str) -> tuple[str, str] | None:
         match = _KVD_OBJECT.search(path)
         if match:
             return ("kvd", match.group("id"))
+
+    if host.endswith("tradera.com") or host.endswith("tradera.se"):
+        match = _TRADERA_ITEM.search(path)
+        if match:
+            return ("tradera", match.group("id"))
 
     return None

@@ -8,9 +8,10 @@ from bilmarknad_mcp.blocket_proxy import BlocketProxyClient
 from bilmarknad_mcp.kvd import KvdClient, KvdUnavailableError
 from bilmarknad_mcp.schema import CarListing
 from bilmarknad_mcp.urls import parse_listing_url
+from bilmarknad_mcp.tradera import TraderaClient, TraderaUnavailableError
 from bilmarknad_mcp.wayke import WaykeClient
 
-ALL_SOURCES = ("blocket", "wayke", "kvd")
+ALL_SOURCES = ("blocket", "wayke", "kvd", "tradera")
 
 def normalize_sources(sources):
     if not sources:
@@ -62,6 +63,7 @@ class SearchService:
         self.blocket = None
         self.wayke = None
         self.kvd = None
+        self.tradera = None
 
     def blocket_client(self):
         if self.blocket is None:
@@ -82,8 +84,13 @@ class SearchService:
             self.kvd = KvdClient()
         return self.kvd
 
+    def tradera_client(self):
+        if self.tradera is None:
+            self.tradera = TraderaClient()
+        return self.tradera
+
     def close(self):
-        for client in (self.blocket, self.wayke, self.kvd):
+        for client in (self.blocket, self.wayke, self.kvd, self.tradera):
             if client is not None:
                 client.close()
 
@@ -123,6 +130,13 @@ class SearchService:
                     collected.extend(self.kvd_client().search())
                 except KvdUnavailableError:
                     pass
+            elif source=="tradera":
+                parts=[p for p in (query,make,model) if p]
+                q=" ".join(parts) if parts else None
+                try:
+                    collected.extend(self.tradera_client().search(q=q,rows=limit,page=page))
+                except TraderaUnavailableError:
+                    pass
         filtered=[item for item in collected if matches_filters(item,make,model,price_min,price_max,year_min,year_max,mileage_max_km)]
         deduped=dedupe_listings(filtered)
         return [item.to_dict() for item in deduped[:limit]]
@@ -139,10 +153,8 @@ class SearchService:
             item=self.blocket_client().get_listing(listing_id)
             return item.to_dict() if item else None
         if src=="wayke":
-            for item in self.wayke_client().search(q=listing_id,rows=40,page=1):
-                if str(item.id)==str(listing_id):
-                    return item.to_dict()
-            return None
+            item=self.wayke_client().get_vehicle(listing_id)
+            return item.to_dict() if item else None
         if src=="kvd":
             try:
                 items=self.kvd_client().search()
@@ -152,7 +164,13 @@ class SearchService:
                 if str(item.id)==str(listing_id):
                     return item.to_dict()
             return None
+        if src=="tradera":
+            try:
+                item=self.tradera_client().get_listing(listing_id)
+            except TraderaUnavailableError:
+                return None
+            return item.to_dict() if item else None
         return None
 
     def list_sources(self):
-        return {"sources":[{"id":"blocket","description":"Blocket mobility used-car search API","env":["BLOCKET_PROXY_URL"]},{"id":"wayke","description":"Wayke vehicle search (REST with API key or public GraphQL)","env":["WAYKE_API_KEY"]},{"id":"kvd","description":"KVD public API probe (returns empty until a stable endpoint exists)","env":[]}],"env":{"WAYKE_API_KEY":{"required":False,"description":"Optional Wayke REST API bearer token","set":bool(os.environ.get("WAYKE_API_KEY"))},"BLOCKET_PROXY_URL":{"required":False,"description":"Optional Blocket search proxy base URL","set":bool(os.environ.get("BLOCKET_PROXY_URL"))}}}
+        return {"sources":[{"id":"blocket","description":"Blocket mobility used-car search API","env":["BLOCKET_PROXY_URL"]},{"id":"wayke","description":"Wayke vehicle search (REST with API key or public GraphQL)","env":["WAYKE_API_KEY"]},{"id":"kvd","description":"KVD public API probe (returns empty until a stable endpoint exists)","env":[]},{"id":"tradera","description":"Tradera car auctions and buy-now listings (REST API v3, 100 calls/day)","env":["TRADERA_APP_ID","TRADERA_APP_KEY","TRADERA_CAR_CATEGORY_ID"]}],"env":{"WAYKE_API_KEY":{"required":False,"description":"Optional Wayke REST API bearer token","set":bool(os.environ.get("WAYKE_API_KEY"))},"BLOCKET_PROXY_URL":{"required":False,"description":"Optional Blocket search proxy base URL","set":bool(os.environ.get("BLOCKET_PROXY_URL"))},"TRADERA_APP_ID":{"required":False,"description":"Tradera developer app ID (defaults to shared dev credentials)","set":bool(os.environ.get("TRADERA_APP_ID"))},"TRADERA_APP_KEY":{"required":False,"description":"Tradera developer app key (defaults to shared dev credentials)","set":bool(os.environ.get("TRADERA_APP_KEY"))},"TRADERA_CAR_CATEGORY_ID":{"required":False,"description":"Tradera category ID for car searches (default 10 = Bilar)","set":bool(os.environ.get("TRADERA_CAR_CATEGORY_ID"))}}}
