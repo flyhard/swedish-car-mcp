@@ -7,6 +7,8 @@ _BLOCKET_ITEM = re.compile(r"/mobility/item/(?P<id>\d+)", re.I)
 _WAYKE_VEHICLE = re.compile(r"/(?:vehicle|fordon|bilar)/(?P<id>[^/?#]+)", re.I)
 _KVD_OBJECT = re.compile(r"/(?:objekt|vehicle|bil|auktion)/(?P<id>\d+)", re.I)
 _TRADERA_ITEM = re.compile(r"/item/(?P<id>\d+)", re.I)
+_RIDDERMARK_CAR = re.compile(r"/kopa-bil/(?P<id>[^/?#]+/[^/?#]+)", re.I)
+_CARLA_CAR = re.compile(r"/bil/(?P<id>[^/?#]+)", re.I)
 
 
 def parse_listing_url(url: str) -> tuple[str, str] | None:
@@ -37,5 +39,15 @@ def parse_listing_url(url: str) -> tuple[str, str] | None:
         match = _TRADERA_ITEM.search(path)
         if match:
             return ("tradera", match.group("id"))
+
+    if host.endswith("riddermarkbil.se"):
+        match = _RIDDERMARK_CAR.search(path)
+        if match:
+            return ("riddermark", match.group("id").strip("/").lower())
+
+    if host.endswith("carla.se"):
+        match = _CARLA_CAR.search(path)
+        if match:
+            return ("carla", match.group("id").strip("/"))
 
     return None

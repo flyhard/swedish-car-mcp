@@ -10,8 +10,10 @@ from bilmarknad_mcp.schema import CarListing
 from bilmarknad_mcp.urls import parse_listing_url
 from bilmarknad_mcp.tradera import TraderaClient, TraderaUnavailableError
 from bilmarknad_mcp.wayke import WaykeClient
+from bilmarknad_mcp.riddermark import RiddermarkClient
+from bilmarknad_mcp.carla import CarlaClient
 
-ALL_SOURCES = ("blocket", "wayke", "kvd", "tradera")
+ALL_SOURCES = ("blocket", "wayke", "kvd", "tradera", "riddermark", "carla")
 
 def normalize_sources(sources):
     if not sources:
@@ -64,6 +66,8 @@ class SearchService:
         self.wayke = None
         self.kvd = None
         self.tradera = None
+        self.riddermark = None
+        self.carla = None
 
     def blocket_client(self):
         if self.blocket is None:
@@ -89,8 +93,18 @@ class SearchService:
             self.tradera = TraderaClient()
         return self.tradera
 
+    def riddermark_client(self):
+        if self.riddermark is None:
+            self.riddermark = RiddermarkClient()
+        return self.riddermark
+
+    def carla_client(self):
+        if self.carla is None:
+            self.carla = CarlaClient()
+        return self.carla
+
     def close(self):
-        for client in (self.blocket, self.wayke, self.kvd, self.tradera):
+        for client in (self.blocket, self.wayke, self.kvd, self.tradera, self.riddermark, self.carla):
             if client is not None:
                 client.close()
 
@@ -137,6 +151,31 @@ class SearchService:
                     collected.extend(self.tradera_client().search(q=q,rows=limit,page=page))
                 except TraderaUnavailableError:
                     pass
+            elif source=="riddermark":
+                collected.extend(
+                    self.riddermark_client().search(
+                        q=query,
+                        make=make,
+                        model=model,
+                        price_min=price_min,
+                        price_max=price_max,
+                        mileage_max_km=mileage_max_km,
+                        rows=limit,
+                        page=page,
+                    )
+                )
+            elif source=="carla":
+                fuel = (fuel_types or [None])[0]
+                collected.extend(
+                    self.carla_client().search(
+                        q=query,
+                        make=make,
+                        model=model,
+                        fuel=fuel,
+                        rows=limit,
+                        page=page,
+                    )
+                )
         filtered=[item for item in collected if matches_filters(item,make,model,price_min,price_max,year_min,year_max,mileage_max_km)]
         deduped=dedupe_listings(filtered)
         return [item.to_dict() for item in deduped[:limit]]
@@ -170,7 +209,13 @@ class SearchService:
             except TraderaUnavailableError:
                 return None
             return item.to_dict() if item else None
+        if src=="riddermark":
+            item=self.riddermark_client().get_listing(listing_id)
+            return item.to_dict() if item else None
+        if src=="carla":
+            item=self.carla_client().get_listing(listing_id)
+            return item.to_dict() if item else None
         return None
 
     def list_sources(self):
-        return {"sources":[{"id":"blocket","description":"Blocket mobility used-car search API","env":["BLOCKET_PROXY_URL"]},{"id":"wayke","description":"Wayke vehicle search (REST with API key or public GraphQL)","env":["WAYKE_API_KEY"]},{"id":"kvd","description":"KVD public API probe (returns empty until a stable endpoint exists)","env":[]},{"id":"tradera","description":"Tradera car auctions and buy-now listings (REST API v3, 100 calls/day)","env":["TRADERA_APP_ID","TRADERA_APP_KEY","TRADERA_CAR_CATEGORY_ID"]}],"env":{"WAYKE_API_KEY":{"required":False,"description":"Optional Wayke REST API bearer token","set":bool(os.environ.get("WAYKE_API_KEY"))},"BLOCKET_PROXY_URL":{"required":False,"description":"Optional Blocket search proxy base URL","set":bool(os.environ.get("BLOCKET_PROXY_URL"))},"TRADERA_APP_ID":{"required":False,"description":"Tradera developer app ID (defaults to shared dev credentials)","set":bool(os.environ.get("TRADERA_APP_ID"))},"TRADERA_APP_KEY":{"required":False,"description":"Tradera developer app key (defaults to shared dev credentials)","set":bool(os.environ.get("TRADERA_APP_KEY"))},"TRADERA_CAR_CATEGORY_ID":{"required":False,"description":"Tradera category ID for car searches (default 10 = Bilar)","set":bool(os.environ.get("TRADERA_CAR_CATEGORY_ID"))}}}
+        return {"sources":[{"id":"blocket","description":"Blocket mobility used-car search API","env":["BLOCKET_PROXY_URL"]},{"id":"wayke","description":"Wayke vehicle search (REST with API key or public GraphQL)","env":["WAYKE_API_KEY"]},{"id":"kvd","description":"KVD public API probe (returns empty until a stable endpoint exists)","env":[]},{"id":"tradera","description":"Tradera car auctions and buy-now listings (REST API v3, 100 calls/day)","env":["TRADERA_APP_ID","TRADERA_APP_KEY","TRADERA_CAR_CATEGORY_ID"]},{"id":"riddermark","description":"Riddermark Bil used-car search via Next.js page data","env":[]},{"id":"carla","description":"Carla EV marketplace search via Next.js data API","env":[]}],"env":{"WAYKE_API_KEY":{"required":False,"description":"Optional Wayke REST API bearer token","set":bool(os.environ.get("WAYKE_API_KEY"))},"BLOCKET_PROXY_URL":{"required":False,"description":"Optional Blocket search proxy base URL","set":bool(os.environ.get("BLOCKET_PROXY_URL"))},"TRADERA_APP_ID":{"required":False,"description":"Tradera developer app ID (defaults to shared dev credentials)","set":bool(os.environ.get("TRADERA_APP_ID"))},"TRADERA_APP_KEY":{"required":False,"description":"Tradera developer app key (defaults to shared dev credentials)","set":bool(os.environ.get("TRADERA_APP_KEY"))},"TRADERA_CAR_CATEGORY_ID":{"required":False,"description":"Tradera category ID for car searches (default 10 = Bilar)","set":bool(os.environ.get("TRADERA_CAR_CATEGORY_ID"))}}}

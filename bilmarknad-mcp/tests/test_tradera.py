@@ -99,7 +99,7 @@ def test_url_tradera():
 
 
 def test_normalize_sources_includes_tradera():
-    assert _normalize_sources(None) == ["blocket", "wayke", "kvd", "tradera"]
+    assert _normalize_sources(None) == ["blocket", "wayke", "kvd", "tradera", "riddermark", "carla"]
 
 
 def test_list_sources_includes_tradera():

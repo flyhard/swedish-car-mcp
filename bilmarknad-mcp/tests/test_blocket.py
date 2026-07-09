@@ -44,11 +44,11 @@ def test_url_blocket():
 
 
 def test_normalize_sources_default():
-    assert _normalize_sources(None) == ["blocket", "wayke", "kvd", "tradera"]
+    assert _normalize_sources(None) == ["blocket", "wayke", "kvd", "tradera", "riddermark", "carla"]
 
 
 def test_list_sources_shape():
     data = SearchService().list_sources()
     assert "sources" in data and "env" in data
     ids = {s["id"] for s in data["sources"]}
-    assert ids == {"blocket", "wayke", "kvd", "tradera"}
+    assert ids == {"blocket", "wayke", "kvd", "tradera", "riddermark", "carla"}

@@ -7,6 +7,8 @@ MCP server for searching Swedish used car marketplaces from AI assistants (Curso
 - **Blocket** — direct mobility search API (optional `blocket-api.se` proxy fallback)
 - **Wayke** — REST with optional `WAYKE_API_KEY`, or public GraphQL
 - **Tradera** — car auctions and buy-now listings via REST API v3 (cached; 100 API calls/day)
+- **Riddermark** — Riddermark Bil used-car search via Next.js page data
+- **Carla** — Carla EV marketplace search via Next.js data API
 - **KVD** — probe only (returns empty until a stable public API exists)
 
 ## Tools
@@ -60,7 +62,7 @@ uv run bilmarknad-mcp
 
 ## Example prompts
 
-- "Search Kia Niro EV under 300 000 kr on Blocket, Wayke, and Tradera"
+- "Search Kia Niro EV under 300 000 kr on Blocket, Wayke, Riddermark, Carla, and Tradera"
 - "Get listing details from this Tradera URL: …"
 - "Which sources are configured?"
 
@@ -73,7 +75,7 @@ Listings may include optional SoH fields parsed from ad text (no structured API 
 |-------|------|-------------|
 | `soh_percent` | float | Battery state of health (0–100), e.g. from `99% SoH` or `91.4% batterihälsa` |
 | `battery_tested` | bool | `true` when text mentions batteritestad, Aviloo, hälsotillstånd, etc. |
-| `soh_source` | string | Where SoH was found: `blocket_search`, `blocket_detail`, `wayke_search`, `wayke_detail`, `tradera_search`, `tradera_detail` |
+| `soh_source` | string | Where SoH was found: `blocket_search`, `blocket_detail`, `wayke_search`, `wayke_detail`, `tradera_search`, `tradera_detail`, `riddermark_search`, `riddermark_detail`, `carla_search`, `carla_detail` |
 | `soh_raw_match` | string | Substring that matched the percent pattern |
 
 - **Search results** — Blocket parses `model_specification`, heading, extras, labels; Wayke parses title and `shortDescription`.
