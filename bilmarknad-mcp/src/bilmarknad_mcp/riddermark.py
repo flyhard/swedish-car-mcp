@@ -160,3 +160,10 @@ class RiddermarkClient:
     def close(self) -> None:
         if self._owns and self._client is not None:
             self._client.close()
+
+
+def parse_riddermark_url(url):
+    import importlib
+    mod=importlib.import_module("bilmarknad_mcp.urls")
+    parsed=mod.parse_listing_url(url)
+    return parsed if parsed and parsed[0]=="riddermark" else None

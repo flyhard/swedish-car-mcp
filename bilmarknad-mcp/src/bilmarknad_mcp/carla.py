@@ -60,6 +60,7 @@ def _detail_fields(item: dict[str, Any]) -> list[str | None]:
     return [
         _title(item),
         item.get("version"),
+        item.get("description"),
         item.get("batteryTestResult"),
         json.dumps(item.get("batteryState"), ensure_ascii=False) if item.get("batteryState") else None,
     ]
@@ -199,3 +200,10 @@ class CarlaClient:
     def close(self) -> None:
         if self._owns and self._client is not None:
             self._client.close()
+
+
+def parse_carla_url(url):
+    import importlib
+    mod=importlib.import_module("bilmarknad_mcp.urls")
+    parsed=mod.parse_listing_url(url)
+    return parsed if parsed and parsed[0]=="carla" else None
