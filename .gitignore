@@ -3,3 +3,6 @@
 **/.pytest_cache/
 **/*.egg-info/
 .DS_Store
+/bin/
+dist/
+coverage.out
