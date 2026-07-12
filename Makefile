@@ -22,4 +22,5 @@ clean:
 	rm -rf $(BIN_DIR)
 
 install-launchers:
-	SWEDISH_CAR_MCP_PREFIX="$(PREFIX)" ./scripts/install.sh --prefix "$(PREFIX)"
+	chmod +x install.sh scripts/install.sh scripts/bilmarknad-mcp scripts/aviloo-mcp
+	SWEDISH_CAR_MCP_PREFIX="$(PREFIX)" ./install.sh --prefix "$(PREFIX)"

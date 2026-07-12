@@ -9,13 +9,14 @@ Both servers are implemented in **Go** and distributed as static binaries via [G
 One-time setup. `mcp.json` paths never change; launchers refresh from GitHub Releases in the background.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/flyhard/swedish-car-mcp/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/flyhard/swedish-car-mcp/main/install.sh | bash
 ```
 
 Or from a clone:
 
 ```bash
-./scripts/install.sh
+./install.sh
+# or: ./scripts/install.sh
 # or: make install-launchers
 ```
 
