@@ -21,6 +21,8 @@ builds:
       - arm64
 archives:
   - format: tar.gz
+    # Must match scm_archive_name() in scripts/lib/common.sh
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md

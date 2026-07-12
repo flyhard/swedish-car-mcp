@@ -43,12 +43,28 @@ scm_platform() {
 
 scm_github_api() {
   local path="$1"
+  local tmp http_code
+  tmp="$(mktemp)"
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
-      "https://api.github.com${path}"
+    http_code="$(curl -sSL -w "%{http_code}" -o "$tmp" \
+      -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+      "https://api.github.com${path}")"
   else
-    curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com${path}"
+    http_code="$(curl -sSL -w "%{http_code}" -o "$tmp" \
+      -H "Accept: application/vnd.github+json" "https://api.github.com${path}")"
   fi
+  if [[ "$http_code" != "200" ]]; then
+    if [[ "$http_code" == "404" ]]; then
+      echo "no GitHub release found for ${SWEDISH_CAR_MCP_REPO} (HTTP 404)" >&2
+      echo "Publish a release first, or re-run install with --no-download." >&2
+    else
+      echo "GitHub API error ${http_code} for ${path}" >&2
+    fi
+    rm -f "$tmp"
+    return 1
+  fi
+  cat "$tmp"
+  rm -f "$tmp"
 }
 
 scm_resolved_version() {
@@ -57,7 +73,7 @@ scm_resolved_version() {
     return 0
   fi
   local raw tag
-  raw="$(scm_github_api "/repos/${SWEDISH_CAR_MCP_REPO}/releases/latest")"
+  raw="$(scm_github_api "/repos/${SWEDISH_CAR_MCP_REPO}/releases/latest")" || return 1
   tag="$(printf '%s' "$raw" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/')"
   if [[ -z "$tag" ]]; then
     echo "could not parse latest release tag" >&2
