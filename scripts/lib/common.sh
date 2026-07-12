@@ -19,6 +19,7 @@ scm_detect_os() {
   case "$(uname -s)" in
     Darwin) echo "darwin" ;;
     Linux) echo "linux" ;;
+    MINGW* | MSYS* | CYGWIN* | Windows_NT) echo "windows" ;;
     *)
       echo "unsupported OS: $(uname -s)" >&2
       return 1
@@ -39,6 +40,24 @@ scm_detect_arch() {
 
 scm_platform() {
   echo "$(scm_detect_os)_$(scm_detect_arch)"
+}
+
+scm_binary_filename() {
+  local name="$1"
+  if [[ "$(scm_detect_os)" == "windows" ]]; then
+    echo "${name}.exe"
+  else
+    echo "$name"
+  fi
+}
+
+scm_archive_name() {
+  local version="$1"
+  if [[ "$(scm_detect_os)" == "windows" ]]; then
+    echo "swedish-car-mcp_${version}_$(scm_platform).zip"
+  else
+    echo "swedish-car-mcp_${version}_$(scm_platform).tar.gz"
+  fi
 }
 
 scm_github_api() {
@@ -82,11 +101,6 @@ scm_resolved_version() {
   echo "$tag"
 }
 
-scm_archive_name() {
-  local version="$1"
-  echo "swedish-car-mcp_${version}_$(scm_platform).tar.gz"
-}
-
 scm_version_file() {
   echo "$(scm_cache_dir)/current-version"
 }
@@ -127,7 +141,16 @@ scm_binary_path() {
   local name="$1"
   local version="${2:-$(scm_installed_version)}"
   [[ -n "$version" ]] || return 1
-  echo "$(scm_cache_dir)/${version}/${name}"
+  echo "$(scm_cache_dir)/${version}/$(scm_binary_filename "$name")"
+}
+
+scm_binary_ready() {
+  local path="$1"
+  if [[ "$(scm_detect_os)" == "windows" ]]; then
+    [[ -f "$path" ]]
+  else
+    [[ -x "$path" ]]
+  fi
 }
 
 scm_verify_checksum() {
@@ -174,13 +197,18 @@ scm_download_version() {
     return 1
   fi
 
-  tar -xzf "$archive_path" -C "$dest_dir"
+  if [[ "$(scm_detect_os)" == "windows" ]]; then
+    unzip -o "$archive_path" -d "$dest_dir"
+  else
+    tar -xzf "$archive_path" -C "$dest_dir"
+  fi
   rm -f "$archive_path"
   echo "$version" >"$(scm_version_file)"
 
   for bin in bilmarknad-mcp aviloo-mcp; do
-    if [[ -f "$dest_dir/$bin" ]]; then
-      chmod +x "$dest_dir/$bin"
+    local bin_path="$dest_dir/$(scm_binary_filename "$bin")"
+    if [[ -f "$bin_path" ]]; then
+      chmod +x "$bin_path" 2>/dev/null || true
     fi
   done
 }
@@ -189,7 +217,7 @@ scm_ensure_release() {
   local installed want
   installed="$(scm_installed_version)"
 
-  if [[ -n "$installed" ]] && [[ -x "$(scm_binary_path bilmarknad-mcp "$installed")" ]]; then
+  if [[ -n "$installed" ]] && scm_binary_ready "$(scm_binary_path bilmarknad-mcp "$installed")"; then
     if ! scm_should_check_update; then
       return 0
     fi
@@ -212,7 +240,7 @@ scm_ensure_binary() {
   scm_ensure_release
   local path
   path="$(scm_binary_path "$name")"
-  if [[ ! -x "$path" ]]; then
+  if ! scm_binary_ready "$path"; then
     echo "binary not found: $path" >&2
     return 1
   fi

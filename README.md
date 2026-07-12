@@ -4,9 +4,11 @@ MCP servers for Swedish used EV / car buying workflows in Cursor and other MCP h
 
 Both servers are implemented in **Go** and distributed as static binaries via [GitHub Releases](https://github.com/flyhard/swedish-car-mcp/releases).
 
+Supported platforms: **macOS**, **Linux**, and **Windows** (`amd64` and `arm64`).
+
 ## Install (recommended — auto-updating launchers)
 
-One-time setup. `mcp.json` paths never change; launchers refresh from GitHub Releases in the background.
+One-time setup on **macOS and Linux** (also works in **Git Bash** on Windows). `mcp.json` paths never change; launchers refresh from GitHub Releases in the background.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/flyhard/swedish-car-mcp/main/install.sh | bash
@@ -40,14 +42,36 @@ export SWEDISH_CAR_MCP_VERSION=v1.0.0
 
 If you prefer a fixed binary without auto-update:
 
-1. Open [Releases](https://github.com/flyhard/swedish-car-mcp/releases) and download the archive for your OS/arch (`darwin`/`linux`, `arm64`/`amd64`).
-2. Extract `aviloo-mcp` and/or `bilmarknad-mcp` to a directory on your `PATH` (for example `~/bin`).
+1. Open [Releases](https://github.com/flyhard/swedish-car-mcp/releases) and download the archive for your OS/arch:
+   - macOS / Linux: `.tar.gz` (`darwin`/`linux`, `arm64`/`amd64`)
+   - Windows: `.zip` (`windows`, `amd64` or `arm64`)
+2. Extract `aviloo-mcp` and/or `bilmarknad-mcp` (`.exe` on Windows) to a directory on your `PATH`.
 
 Or build locally:
 
 ```bash
 make build
-# binaries in ./bin/
+# binaries in ./bin/  (add .exe on Windows)
+```
+
+### Windows (native)
+
+Download the `windows_*` zip from [Releases](https://github.com/flyhard/swedish-car-mcp/releases), extract both `.exe` files, and point Cursor `mcp.json` at them directly:
+
+```json
+{
+  "mcpServers": {
+    "bilmarknad": {
+      "command": "C:\\Users\\YOU\\bin\\bilmarknad-mcp.exe"
+    },
+    "aviloo": {
+      "command": "C:\\Users\\YOU\\bin\\aviloo-mcp.exe",
+      "env": {
+        "AVILOO_MCP_REPO_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
 ```
 
 ## Cursor (project `.cursor/mcp.json`)
