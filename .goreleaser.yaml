@@ -1,5 +1,7 @@
-name: swedish-car-mcp
-version: 1.0.0
+version: 2
+
+project_name: swedish-car-mcp
+
 builds:
   - id: aviloo-mcp
     main: ./cmd/aviloo-mcp
@@ -19,17 +21,20 @@ builds:
     goarch:
       - amd64
       - arm64
+
 archives:
   - format: tar.gz
     # Must match scm_archive_name() in scripts/lib/common.sh
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
-      - LICENSE
       - README.md
+
 checksum:
-  name_template: 'checksums.txt'
+  name_template: checksums.txt
+
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
