@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "$SCRIPT_DIR/../share/swedish-car-mcp/lib/common.sh" ]]; then
+  # shellcheck source=../share/swedish-car-mcp/lib/common.sh
+  source "$SCRIPT_DIR/../share/swedish-car-mcp/lib/common.sh"
+elif [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
+  # shellcheck source=lib/common.sh
+  source "$SCRIPT_DIR/lib/common.sh"
+else
+  echo "swedish-car-mcp launcher: common.sh not found; run scripts/install.sh" >&2
+  exit 1
+fi
+
+BIN="$(scm_ensure_binary aviloo-mcp)"
+exec "$BIN" "$@"

@@ -1,0 +1,36 @@
+name: swedish-car-mcp
+version: 1.0.0
+builds:
+  - id: aviloo-mcp
+    main: ./cmd/aviloo-mcp
+    binary: aviloo-mcp
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+  - id: bilmarknad-mcp
+    main: ./cmd/bilmarknad-mcp
+    binary: bilmarknad-mcp
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+archives:
+  - format: tar.gz
+    files:
+      - LICENSE
+      - README.md
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
