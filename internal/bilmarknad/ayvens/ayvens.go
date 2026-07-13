@@ -347,14 +347,6 @@ func parseDetailHTML(htmlBody, path string) schema.CarListing {
 	return listing
 }
 
-func (c *Client) enrichSOHFromInspection(ctx context.Context, listing *schema.CarListing, reportURL string) {
-	body, err := c.fetch(ctx, reportURL)
-	if err != nil || strings.TrimSpace(body) == "" {
-		return
-	}
-	soh.Apply(listing, "ayvens_inspection", body)
-}
-
 func detailFields(htmlBody string) map[string]string {
 	out := map[string]string{}
 	for _, m := range detailContainerRE.FindAllStringSubmatch(htmlBody, -1) {
