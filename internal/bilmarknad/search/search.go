@@ -2,12 +2,14 @@ package search
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/blocket"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/blocketproxy"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/carla"
+	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/httputil"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/kvd"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/riddermark"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/schema"
@@ -36,6 +38,7 @@ type SearchOptions struct {
 	Query         *string
 	Make          *string
 	Model         *string
+	LicensePlate  *string
 	PriceMin      *int
 	PriceMax      *int
 	YearMin       *int
@@ -95,7 +98,12 @@ func dedupeListings(items []schema.CarListing) []schema.CarListing {
 	return out
 }
 
-func matchesFilters(item schema.CarListing, make, model *string, priceMin, priceMax, yearMin, yearMax, mileageMax *int) bool {
+func matchesFilters(item schema.CarListing, make, model *string, priceMin, priceMax, yearMin, yearMax, mileageMax *int, licensePlate string) bool {
+	if licensePlate != "" && !schema.RegistrationMatches(item.RegistrationNumber, licensePlate) {
+		if !mentionsLicensePlate(item, licensePlate) {
+			return false
+		}
+	}
 	if make != nil && *make != "" && item.Make != nil && !strings.Contains(strings.ToLower(*item.Make), strings.ToLower(strings.TrimSpace(*make))) {
 		return false
 	}
@@ -205,8 +213,19 @@ func (s *Service) SearchCars(ctx context.Context, opts SearchOptions) ([]map[str
 	}
 	active := NormalizeSources(opts.Sources)
 	var collected []schema.CarListing
+	licensePlate := ""
+	if opts.LicensePlate != nil {
+		licensePlate = schema.NormalizeRegistrationNumber(*opts.LicensePlate)
+	}
+	searchQuery := primaryQuery(opts)
 
 	for _, source := range active {
+		if licensePlate != "" {
+			if item := s.lookupByLicensePlate(ctx, source, licensePlate); item != nil {
+				collected = append(collected, *item)
+				continue
+			}
+		}
 		switch source {
 		case "blocket":
 			fuels := opts.FuelTypes
@@ -215,7 +234,7 @@ func (s *Service) SearchCars(ctx context.Context, opts SearchOptions) ([]map[str
 			}
 			for _, fuel := range fuels {
 				bp := blocket.SearchParams{
-					Q: opts.Query, Make: opts.Make, Model: opts.Model,
+					Q: searchQuery, Make: opts.Make, Model: opts.Model,
 					PriceFrom: opts.PriceMin, PriceTo: opts.PriceMax,
 					YearFrom: opts.YearMin, YearTo: opts.YearMax,
 					MileageToKM: opts.MileageMaxKM, Transmission: opts.Transmission,
@@ -228,46 +247,56 @@ func (s *Service) SearchCars(ctx context.Context, opts SearchOptions) ([]map[str
 					params := blocket.BuildParams(bp)
 					items, err := s.blocketProxyClient().Search(ctx, params)
 					if err != nil {
+						if isSkippableSourceErr(err) {
+							break
+						}
 						return nil, err
 					}
 					collected = append(collected, items...)
 				} else {
 					items, err := s.blocketClientTyped().Search(ctx, bp)
 					if err != nil {
+						if isSkippableSourceErr(err) {
+							break
+						}
 						return nil, err
 					}
 					collected = append(collected, items...)
 				}
 			}
 		case "wayke":
-			q := joinQuery(opts.Query, opts.Make, opts.Model)
-			items, err := s.waykeClient().Search(ctx, q, limit, page)
+			items, err := s.waykeClient().Search(ctx, searchQuery, limit, page)
 			if err != nil {
+				if isSkippableSourceErr(err) {
+					continue
+				}
 				return nil, err
 			}
 			collected = append(collected, items...)
 		case "kvd":
 			items, err := s.kvdClient().Search(ctx)
 			if err != nil {
-				if _, ok := err.(kvd.UnavailableError); ok {
+				if isSkippableSourceErr(err) {
 					continue
 				}
 				return nil, err
 			}
 			collected = append(collected, items...)
 		case "tradera":
-			q := joinQuery(opts.Query, opts.Make, opts.Model)
-			items, err := s.traderaClient().Search(ctx, q, limit, page, "Relevance")
+			items, err := s.traderaClient().Search(ctx, searchQuery, limit, page, "Relevance")
 			if err != nil {
-				if _, ok := err.(tradera.UnavailableError); ok {
+				if isSkippableSourceErr(err) {
 					continue
 				}
 				return nil, err
 			}
 			collected = append(collected, items...)
 		case "riddermark":
-			items, err := s.riddermarkClient().Search(ctx, opts.Query, opts.Make, opts.Model, opts.PriceMin, opts.PriceMax, opts.MileageMaxKM, limit, page)
+			items, err := s.riddermarkClient().Search(ctx, searchQuery, opts.Make, opts.Model, opts.PriceMin, opts.PriceMax, opts.MileageMaxKM, limit, page)
 			if err != nil {
+				if isSkippableSourceErr(err) {
+					continue
+				}
 				return nil, err
 			}
 			collected = append(collected, items...)
@@ -276,8 +305,11 @@ func (s *Service) SearchCars(ctx context.Context, opts SearchOptions) ([]map[str
 			if len(opts.FuelTypes) > 0 {
 				fuel = &opts.FuelTypes[0]
 			}
-			items, err := s.carlaClient().Search(ctx, opts.Query, opts.Make, opts.Model, fuel, limit, page)
+			items, err := s.carlaClient().Search(ctx, searchQuery, opts.Make, opts.Model, fuel, limit, page)
 			if err != nil {
+				if isSkippableSourceErr(err) {
+					continue
+				}
 				return nil, err
 			}
 			collected = append(collected, items...)
@@ -286,7 +318,7 @@ func (s *Service) SearchCars(ctx context.Context, opts SearchOptions) ([]map[str
 
 	filtered := make([]schema.CarListing, 0, len(collected))
 	for _, item := range collected {
-		if matchesFilters(item, opts.Make, opts.Model, opts.PriceMin, opts.PriceMax, opts.YearMin, opts.YearMax, opts.MileageMaxKM) {
+		if matchesFilters(item, opts.Make, opts.Model, opts.PriceMin, opts.PriceMax, opts.YearMin, opts.YearMax, opts.MileageMaxKM, licensePlate) {
 			filtered = append(filtered, item)
 		}
 	}
@@ -299,6 +331,19 @@ func (s *Service) SearchCars(ctx context.Context, opts SearchOptions) ([]map[str
 		out[i] = item.ToMap()
 	}
 	return out, nil
+}
+
+func isSkippableSourceErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if _, ok := err.(kvd.UnavailableError); ok {
+		return true
+	}
+	if _, ok := err.(tradera.UnavailableError); ok {
+		return true
+	}
+	return httputil.IsRateLimited(err)
 }
 
 func (s *Service) blocketClientTyped() *blocket.Client {
@@ -329,6 +374,91 @@ func joinQuery(parts ...*string) *string {
 	return &joined
 }
 
+func primaryQuery(opts SearchOptions) *string {
+	if opts.LicensePlate != nil {
+		if plate := schema.NormalizeRegistrationNumber(*opts.LicensePlate); plate != "" {
+			return &plate
+		}
+	}
+	return joinQuery(opts.Query, opts.Make, opts.Model)
+}
+
+func (s *Service) lookupByLicensePlate(ctx context.Context, source, plate string) *schema.CarListing {
+	plate = schema.NormalizeRegistrationNumber(plate)
+	if plate == "" {
+		return nil
+	}
+	var (
+		item *schema.CarListing
+		err  error
+	)
+	switch source {
+	case "blocket":
+		item, err = s.blocketClientTyped().GetListing(ctx, plate)
+	case "wayke":
+		item, err = s.waykeClient().GetByLicensePlate(ctx, plate)
+	case "riddermark":
+		item, err = s.riddermarkClient().GetListing(ctx, plate)
+	case "carla":
+		item, err = s.carlaClient().GetListing(ctx, plate)
+	case "tradera":
+		item = s.lookupTraderaByLicensePlate(ctx, plate)
+	case "kvd":
+		return nil
+	default:
+		return nil
+	}
+	if err != nil || item == nil {
+		return nil
+	}
+	if schema.RegistrationMatches(item.RegistrationNumber, plate) {
+		return item
+	}
+	if mentionsLicensePlate(*item, plate) {
+		return item
+	}
+	return nil
+}
+
+func (s *Service) lookupTraderaByLicensePlate(ctx context.Context, plate string) *schema.CarListing {
+	results, err := s.traderaClient().Search(ctx, &plate, 20, 1, "Relevance")
+	if err != nil {
+		return nil
+	}
+	for i := range results {
+		if mentionsLicensePlate(results[i], plate) {
+			if detail, err := s.traderaClient().GetListing(ctx, results[i].ID); err == nil && detail != nil {
+				return detail
+			}
+			return &results[i]
+		}
+	}
+	return nil
+}
+
+func mentionsLicensePlate(item schema.CarListing, plate string) bool {
+	plate = schema.NormalizeRegistrationNumber(plate)
+	if plate == "" {
+		return true
+	}
+	fields := []string{item.Title}
+	if item.RegistrationNumber != nil {
+		fields = append(fields, *item.RegistrationNumber)
+	}
+	for _, key := range []string{"short_description", "long_description", "description", "shortDescription"} {
+		if v, ok := item.Raw[key]; ok {
+			fields = append(fields, fmt.Sprint(v))
+		}
+	}
+	needle := strings.ToUpper(plate)
+	for _, field := range fields {
+		if strings.Contains(schema.NormalizeRegistrationNumber(field), needle) {
+			return true
+		}
+	}
+	return false
+}
+
 // GetListing fetches a single listing by source/id or URL.
 func (s *Service) GetListing(ctx context.Context, source, listingID, rawURL *string) map[string]any {
 	src := ""
@@ -343,6 +473,16 @@ func (s *Service) GetListing(ctx context.Context, source, listingID, rawURL *str
 	}
 	if listingID != nil && *listingID != "" {
 		id = *listingID
+	}
+	if src == "" && id != "" {
+		plate := schema.NormalizeRegistrationNumber(id)
+		if plate != "" && len(plate) <= 7 {
+			for _, source := range AllSources {
+				if item := s.lookupByLicensePlate(ctx, source, plate); item != nil {
+					return item.ToMap()
+				}
+			}
+		}
 	}
 	if src == "" || id == "" {
 		return nil

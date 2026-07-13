@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"strings"
 
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/search"
 	"github.com/flyhard/swedish-car-mcp/internal/mcpjson"
@@ -17,6 +18,10 @@ type searchCarsInput struct {
 	Q                *string  `json:"q"`
 	Make             *string  `json:"make"`
 	Model            *string  `json:"model"`
+	LicensePlate     *string  `json:"license_plate"`
+	RegistrationNo   *string  `json:"registration_number"`
+	RegNo            *string  `json:"regno"`
+	RegNr            *string  `json:"regnr"`
 	PriceMin         *int     `json:"price_min"`
 	PriceMax         *int     `json:"price_max"`
 	YearMin          *int     `json:"year_min"`
@@ -45,6 +50,15 @@ func textQuery(in searchCarsInput) *string {
 	return in.Q
 }
 
+func licensePlate(in searchCarsInput) *string {
+	for _, p := range []*string{in.LicensePlate, in.RegistrationNo, in.RegNo, in.RegNr} {
+		if p != nil && strings.TrimSpace(*p) != "" {
+			return p
+		}
+	}
+	return nil
+}
+
 func searchCars(ctx context.Context, _ *mcp.CallToolRequest, in searchCarsInput) (*mcp.CallToolResult, struct{}, error) {
 	useProxy := in.UseBlocketProxy != nil && *in.UseBlocketProxy
 	svc := defaultService
@@ -61,7 +75,7 @@ func searchCars(ctx context.Context, _ *mcp.CallToolRequest, in searchCarsInput)
 		page = *in.Page
 	}
 	results, err := svc.SearchCars(ctx, search.SearchOptions{
-		Query: textQuery(in), Make: in.Make, Model: in.Model,
+		Query: textQuery(in), Make: in.Make, Model: in.Model, LicensePlate: licensePlate(in),
 		PriceMin: in.PriceMin, PriceMax: in.PriceMax,
 		YearMin: in.YearMin, YearMax: in.YearMax,
 		MileageMaxKM: in.MileageMaxKM, FuelTypes: in.FuelTypes,
@@ -101,8 +115,8 @@ func listSources(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.Ca
 // Run starts the bilmarknad MCP server on stdio.
 func Run(ctx context.Context) error {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "bilmarknad", Version: version}, nil)
-	mcp.AddTool(srv, &mcp.Tool{Name: "search_cars", Description: "Search used cars across Swedish marketplaces."}, searchCars)
-	mcp.AddTool(srv, &mcp.Tool{Name: "get_listing", Description: "Fetch one listing by source+id or by public listing URL."}, getListing)
+	mcp.AddTool(srv, &mcp.Tool{Name: "search_cars", Description: "Search used cars across Swedish marketplaces. Use license_plate (or registration_number/regno) for direct lookup by registration number."}, searchCars)
+	mcp.AddTool(srv, &mcp.Tool{Name: "get_listing", Description: "Fetch one listing by source+id, license plate, or public listing URL."}, getListing)
 	mcp.AddTool(srv, &mcp.Tool{Name: "list_sources", Description: "List supported sources and related environment variables."}, listSources)
 	return srv.Run(ctx, &mcp.StdioTransport{})
 }

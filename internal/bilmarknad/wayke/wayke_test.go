@@ -33,6 +33,32 @@ func detailHTML() string {
 	}</script></head></html>`
 }
 
+func searchHTMLWithPlate() string {
+	payload := `{"_id":"0fe35f55-7142-4665-aad4-e853128d735e","acceptsTestDriveInquiries":false,"title":"Volvo V90 Cross Country","manufacturer":"Volvo","modelSeries":"V90","modelYear":2018,"mileage":12253,"registrationNumber":"RMC648","price":299800,"fuelType":"Diesel","gearboxType":"Automat","shortDescription":"D4 AWD","itemPublished":"2026-07-12T18:14:20.8482534Z","position":{"city":"Strängnäs"},"branches":[{"name":"Riddermark Bil"}],"featuredImage":{"files":[{"formats":[{"format":"770x514","url":"https://cdn.wayke.se/example.jpg"}]}]}}`
+	return `<html><body>"documents":[` + payload + `]</body></html>`
+}
+
+func TestWaykeGetByLicensePlateMockTransport(t *testing.T) {
+	client := wayke.NewClient(&http.Client{Transport: rt(func(req *http.Request) (*http.Response, error) {
+		if strings.Contains(req.URL.Path, "/sok") {
+			return textResp(200, searchHTMLWithPlate()), nil
+		}
+		if strings.Contains(req.URL.Path, "/objekt/0fe35f55-7142-4665-aad4-e853128d735e") {
+			return textResp(200, detailHTML()), nil
+		}
+		return textResp(404, ""), nil
+	})}, "")
+	defer client.Close()
+
+	listing, err := client.GetByLicensePlate(context.Background(), "rmc648")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if listing == nil || listing.RegistrationNumber == nil || *listing.RegistrationNumber != "RMC648" {
+		t.Fatalf("listing = %+v", listing)
+	}
+}
+
 func TestWaykeSearchScrapeMockTransport(t *testing.T) {
 	client := wayke.NewClient(&http.Client{Transport: rt(func(req *http.Request) (*http.Response, error) {
 		if strings.Contains(req.URL.Path, "/sok/volvo") {

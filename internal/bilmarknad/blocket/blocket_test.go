@@ -53,6 +53,24 @@ func TestParseAdMileageKM(t *testing.T) {
 	}
 }
 
+func TestBlocketGetListingByRegistrationNumber(t *testing.T) {
+	client := blocket.NewClient(&http.Client{Transport: roundTripper(func(req *http.Request) (*http.Response, error) {
+		body := `{"docs":[{"ad_id":99,"heading":"Volvo V90","regno":"RMC648","mileage":100,"price":{"amount":250000}}]}`
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: http.Header{"Content-Type": []string{"application/json"}}}, nil
+	})})
+	defer client.Close()
+	listing, err := client.GetListing(context.Background(), "RMC648")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if listing == nil || listing.ID != "99" {
+		t.Fatalf("listing = %+v", listing)
+	}
+	if listing.RegistrationNumber == nil || *listing.RegistrationNumber != "RMC648" {
+		t.Fatalf("registration = %v", listing.RegistrationNumber)
+	}
+}
+
 func TestBlocketSearchMockTransport(t *testing.T) {
 	client := blocket.NewClient(&http.Client{Transport: roundTripper(func(req *http.Request) (*http.Response, error) {
 		body := `{"docs":[{"ad_id":99,"heading":"Kia Niro","mileage":100,"price":{"amount":250000}}]}`

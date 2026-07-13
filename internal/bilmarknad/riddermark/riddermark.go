@@ -132,7 +132,7 @@ func (c *Client) fetchNextData(ctx context.Context, path string, params url.Valu
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := httputil.DoWithRetry(ctx, c.httpClient, req, "riddermark", httputil.DefaultRetryPolicy())
 	if err != nil {
 		return nil, err
 	}

@@ -132,7 +132,7 @@ func (c *Client) searchREST(ctx context.Context, q *string, rows, page int) ([]s
 		query.Set("search", *q)
 	}
 	req.URL.RawQuery = query.Encode()
-	resp, err := c.httpClient.Do(req)
+	resp, err := httputil.DoWithRetry(ctx, c.httpClient, req, "wayke", httputil.DefaultRetryPolicy())
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (c *Client) GetVehicle(ctx context.Context, vehicleID string) (*schema.CarL
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, restURL+"/"+vehicleID, nil)
 		if err == nil {
 			req.Header.Set("Authorization", "Bearer "+c.apiKey)
-			resp, err := c.httpClient.Do(req)
+			resp, err := httputil.DoWithRetry(ctx, c.httpClient, req, "wayke", httputil.DefaultRetryPolicy())
 			if err == nil {
 				defer resp.Body.Close()
 				if resp.StatusCode == 200 {

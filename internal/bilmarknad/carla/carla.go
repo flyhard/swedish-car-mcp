@@ -188,7 +188,7 @@ func (c *Client) fetchNextData(ctx context.Context, path string, params url.Valu
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := httputil.DoWithRetry(ctx, c.httpClient, req, "carla", httputil.DefaultRetryPolicy())
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +245,17 @@ func (c *Client) GetListing(ctx context.Context, listingID string) (*schema.CarL
 	}
 	if strings.HasPrefix(slug, "bil/") {
 		slug = strings.SplitN(slug, "/", 2)[1]
+	}
+	if plate := schema.NormalizeRegistrationNumber(slug); plate != "" && !strings.Contains(slug, "-") && len(plate) <= 7 {
+		results, err := c.Search(ctx, &plate, nil, nil, nil, 20, 1)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range results {
+			if schema.RegistrationMatches(item.RegistrationNumber, plate) {
+				return c.GetListing(ctx, item.ID)
+			}
+		}
 	}
 	path := "/bil/" + url.PathEscape(slug)
 	data, err := c.fetchNextData(ctx, path, nil)

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/carla"
+	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/httputil"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/search"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/urls"
 )
@@ -52,6 +53,25 @@ func detailHTML() string {
 	}
 	b, _ := json.Marshal(payload)
 	return `<html><script id="__NEXT_DATA__" type="application/json">` + string(b) + `</script></html>`
+}
+
+func TestCarlaSearchReturnsRateLimitedAfterRetries(t *testing.T) {
+	var calls int
+	client := carla.NewClient(&http.Client{Transport: rt(func(*http.Request) (*http.Response, error) {
+		calls++
+		return textResp(http.StatusTooManyRequests, ""), nil
+	})})
+	defer client.Close()
+	_, err := client.Search(context.Background(), nil, nil, nil, nil, 5, 1)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !httputil.IsRateLimited(err) {
+		t.Fatalf("err = %v", err)
+	}
+	if calls != 3 {
+		t.Fatalf("calls = %d, want 3", calls)
+	}
 }
 
 func TestMapCarlaFuelType(t *testing.T) {

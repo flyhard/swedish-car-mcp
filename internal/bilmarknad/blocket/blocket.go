@@ -294,7 +294,7 @@ func (c *Client) Search(ctx context.Context, p SearchParams) ([]schema.CarListin
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := httputil.DoWithRetry(ctx, c.httpClient, req, "blocket", httputil.DefaultRetryPolicy())
 	if err != nil {
 		return nil, err
 	}
@@ -326,8 +326,13 @@ func (c *Client) GetListing(ctx context.Context, listingID string) (*schema.CarL
 	if err != nil {
 		return nil, err
 	}
+	targetID := strings.TrimSpace(listingID)
+	targetPlate := schema.NormalizeRegistrationNumber(listingID)
 	for i := range results {
-		if results[i].ID == listingID {
+		if results[i].ID == targetID {
+			return c.enrichListing(ctx, &results[i])
+		}
+		if targetPlate != "" && schema.RegistrationMatches(results[i].RegistrationNumber, targetPlate) {
 			return c.enrichListing(ctx, &results[i])
 		}
 	}

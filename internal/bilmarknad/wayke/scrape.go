@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/httputil"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/schema"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/soh"
 )
@@ -83,7 +84,7 @@ func (c *Client) fetchHTML(ctx context.Context, path string, params url.Values) 
 		return "", err
 	}
 	req.Header.Set("Accept-Language", "sv-SE,sv;q=0.9")
-	resp, err := c.httpClient.Do(req)
+	resp, err := httputil.DoWithRetry(ctx, c.httpClient, req, "wayke", httputil.DefaultRetryPolicy())
 	if err != nil {
 		return "", err
 	}

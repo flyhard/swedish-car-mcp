@@ -487,7 +487,7 @@ func (c *Client) getXML(ctx context.Context, url string, params map[string]strin
 		q.Set(k, v)
 	}
 	req.URL.RawQuery = q.Encode()
-	resp, err := c.httpClient.Do(req)
+	resp, err := httputil.DoWithRetry(ctx, c.httpClient, req, "tradera", httputil.DefaultRetryPolicy())
 	if err != nil {
 		return nil, err
 	}
