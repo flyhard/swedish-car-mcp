@@ -1,7 +1,6 @@
 package wayke
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,39 +14,9 @@ import (
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/soh"
 )
 
-const (
-	restURL = "https://api.wayke.se/vehicles"
-	gqlURL  = "https://gql.wayke.se/query"
-)
+const restURL = "https://api.wayke.se/vehicles"
 
-const gqlSearch = `
-query SearchVehicles($search: String, $skip: Int, $take: Int) {
-  vehicles(search: $search, skip: $skip, take: $take) {
-    id title shortDescription
-    manufacturer { name }
-    modelSeries { name }
-    modelYear mileage price fuelType gearbox city
-    organization { name }
-    url image { url }
-    registrationNumber published
-  }
-}`
-
-const gqlVehicle = `
-query GetVehicle($id: String!) {
-  vehicle(id: $id) {
-    id title shortDescription description
-    manufacturer { name }
-    modelSeries { name }
-    modelYear mileage price fuelType gearbox city
-    organization { name }
-    url image { url }
-    registrationNumber published
-    data { properties options }
-  }
-}`
-
-// Client queries Wayke REST or GraphQL APIs.
+// Client queries Wayke via REST (with dealer API key) or public website scrape.
 type Client struct {
 	httpClient *http.Client
 	owns       bool
@@ -147,7 +116,7 @@ func (c *Client) Search(ctx context.Context, q *string, rows, page int) ([]schem
 			return rest, nil
 		}
 	}
-	return c.searchGQL(ctx, q, rows, page)
+	return c.searchScrape(ctx, q, rows, page)
 }
 
 func (c *Client) searchREST(ctx context.Context, q *string, rows, page int) ([]schema.CarListing, error) {
@@ -202,52 +171,6 @@ func (c *Client) searchREST(ctx context.Context, q *string, rows, page int) ([]s
 	return out, nil
 }
 
-func (c *Client) searchGQL(ctx context.Context, q *string, rows, page int) ([]schema.CarListing, error) {
-	search := ""
-	if q != nil {
-		search = *q
-	}
-	payload := map[string]any{
-		"query": gqlSearch,
-		"variables": map[string]any{
-			"search": search,
-			"skip":   (page - 1) * rows,
-			"take":   rows,
-		},
-	}
-	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gqlURL, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return nil, nil
-	}
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var data map[string]any
-	if err := json.Unmarshal(respBody, &data); err != nil {
-		return nil, err
-	}
-	root, _ := data["data"].(map[string]any)
-	vehicles, _ := root["vehicles"].([]any)
-	out := make([]schema.CarListing, 0, len(vehicles))
-	for _, item := range vehicles {
-		if m, ok := item.(map[string]any); ok {
-			out = append(out, parseVehicle(m))
-		}
-	}
-	return out, nil
-}
-
 func (c *Client) GetVehicle(ctx context.Context, vehicleID string) (*schema.CarListing, error) {
 	if c.apiKey != "" {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, restURL+"/"+vehicleID, nil)
@@ -267,39 +190,7 @@ func (c *Client) GetVehicle(ctx context.Context, vehicleID string) (*schema.CarL
 			}
 		}
 	}
-	payload := map[string]any{
-		"query":     gqlVehicle,
-		"variables": map[string]any{"id": vehicleID},
-	}
-	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gqlURL, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return nil, nil
-	}
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var data map[string]any
-	if err := json.Unmarshal(respBody, &data); err != nil {
-		return nil, err
-	}
-	root, _ := data["data"].(map[string]any)
-	item, _ := root["vehicle"].(map[string]any)
-	if item == nil {
-		return nil, nil
-	}
-	listing := parseVehicle(item)
-	return enrichSOH(&listing, item), nil
+	return c.getVehicleScrape(ctx, vehicleID)
 }
 
 func (c *Client) Close() {

@@ -8,7 +8,7 @@ import (
 
 var (
 	blocketItem     = regexp.MustCompile(`(?i)/mobility/item/(?P<id>\d+)`)
-	waykeVehicle    = regexp.MustCompile(`(?i)/(?:vehicle|fordon|bilar)/(?P<id>[^/?#]+)`)
+	waykeVehicle    = regexp.MustCompile(`(?i)/(?:objekt|vehicle|fordon|bilar)/(?P<id>[^/?#]+)`)
 	kvdObject       = regexp.MustCompile(`(?i)/(?:objekt|vehicle|bil|auktion)/(?P<id>\d+)`)
 	traderaItem     = regexp.MustCompile(`(?i)/item/(?P<id>\d+)`)
 	riddermarkCar   = regexp.MustCompile(`(?i)/kopa-bil/(?P<make>[^/]+)/(?P<id>[^/?#]+)`)

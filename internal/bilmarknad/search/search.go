@@ -387,7 +387,7 @@ func (s *Service) ListSources() map[string]any {
 	return map[string]any{
 		"sources": []map[string]any{
 			{"id": "blocket", "description": "Blocket mobility used-car search API", "env": []string{"BLOCKET_PROXY_URL"}},
-			{"id": "wayke", "description": "Wayke vehicle search (REST with API key or public GraphQL)", "env": []string{"WAYKE_API_KEY"}},
+			{"id": "wayke", "description": "Wayke vehicle search (website scrape; optional REST API with dealer key)", "env": []string{"WAYKE_API_KEY"}},
 			{"id": "kvd", "description": "KVD public API probe (returns empty until a stable endpoint exists)", "env": []string{}},
 			{"id": "tradera", "description": "Tradera car auctions and buy-now listings (REST API v3, 100 calls/day)", "env": []string{"TRADERA_APP_ID", "TRADERA_APP_KEY", "TRADERA_CAR_CATEGORY_ID"}},
 			{"id": "riddermark", "description": "Riddermark Bil used-car search via Next.js page data", "env": []string{}},
@@ -400,7 +400,7 @@ func (s *Service) ListSources() map[string]any {
 func listSourcesEnv() map[string]any {
 	return map[string]any{
 		"WAYKE_API_KEY": map[string]any{
-			"required": false, "description": "Optional Wayke REST API bearer token",
+			"required": false, "description": "Optional Wayke REST API bearer token (dealers only; scrape is used without it)",
 			"set": os.Getenv("WAYKE_API_KEY") != "",
 		},
 		"BLOCKET_PROXY_URL": map[string]any{

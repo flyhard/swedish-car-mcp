@@ -102,7 +102,7 @@ Replace `/Users/YOU` with your home directory, or run `echo $HOME/.local/bin/bil
 
 | Variable | Purpose |
 |----------|---------|
-| `WAYKE_API_KEY` | Optional Wayke REST bearer token |
+| `WAYKE_API_KEY` | Optional Wayke REST bearer token (dealers only; scrape is used without it) |
 | `BLOCKET_PROXY_URL` | Optional Blocket search proxy base URL |
 | `TRADERA_APP_ID` | Tradera developer app ID |
 | `TRADERA_APP_KEY` | Tradera developer app key |
