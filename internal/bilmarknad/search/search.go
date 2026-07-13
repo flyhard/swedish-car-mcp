@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/ayvens"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/blocket"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/blocketproxy"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/carla"
@@ -19,7 +20,7 @@ import (
 )
 
 // AllSources is the default marketplace source list.
-var AllSources = []string{"blocket", "wayke", "kvd", "tradera", "riddermark", "carla"}
+var AllSources = []string{"blocket", "wayke", "kvd", "tradera", "riddermark", "carla", "ayvens"}
 
 // Service aggregates marketplace clients.
 type Service struct {
@@ -31,6 +32,7 @@ type Service struct {
 	tradera         *tradera.Client
 	riddermark      *riddermark.Client
 	carla           *carla.Client
+	ayvens          *ayvens.Client
 }
 
 // SearchOptions mirrors the search_cars MCP tool parameters.
@@ -169,6 +171,13 @@ func (s *Service) riddermarkClient() *riddermark.Client {
 	return s.riddermark
 }
 
+func (s *Service) ayvensClient() *ayvens.Client {
+	if s.ayvens == nil {
+		s.ayvens = ayvens.NewClient(nil)
+	}
+	return s.ayvens
+}
+
 func (s *Service) carlaClient() *carla.Client {
 	if s.carla == nil {
 		s.carla = carla.NewClient(nil)
@@ -198,6 +207,9 @@ func (s *Service) Close() {
 	}
 	if s.carla != nil {
 		s.carla.Close()
+	}
+	if s.ayvens != nil {
+		s.ayvens.Close()
 	}
 }
 
@@ -313,6 +325,15 @@ func (s *Service) SearchCars(ctx context.Context, opts SearchOptions) ([]map[str
 				return nil, err
 			}
 			collected = append(collected, items...)
+		case "ayvens":
+			items, err := s.ayvensClient().Search(ctx, searchQuery, opts.Make, opts.Model, opts.PriceMin, opts.PriceMax, opts.MileageMaxKM, limit, page)
+			if err != nil {
+				if isSkippableSourceErr(err) {
+					continue
+				}
+				return nil, err
+			}
+			collected = append(collected, items...)
 		}
 	}
 
@@ -401,6 +422,8 @@ func (s *Service) lookupByLicensePlate(ctx context.Context, source, plate string
 		item, err = s.riddermarkClient().GetListing(ctx, plate)
 	case "carla":
 		item, err = s.carlaClient().GetListing(ctx, plate)
+	case "ayvens":
+		item, err = s.ayvensClient().GetListing(ctx, plate)
 	case "tradera":
 		item = s.lookupTraderaByLicensePlate(ctx, plate)
 	case "kvd":
@@ -512,6 +535,8 @@ func (s *Service) GetListing(ctx context.Context, source, listingID, rawURL *str
 		item, _ = s.riddermarkClient().GetListing(ctx, id)
 	case "carla":
 		item, _ = s.carlaClient().GetListing(ctx, id)
+	case "ayvens":
+		item, _ = s.ayvensClient().GetListing(ctx, id)
 	default:
 		return nil
 	}
@@ -532,6 +557,7 @@ func (s *Service) ListSources() map[string]any {
 			{"id": "tradera", "description": "Tradera car auctions and buy-now listings (REST API v3, 100 calls/day)", "env": []string{"TRADERA_APP_ID", "TRADERA_APP_KEY", "TRADERA_CAR_CATEGORY_ID"}},
 			{"id": "riddermark", "description": "Riddermark Bil used-car search via Next.js page data", "env": []string{}},
 			{"id": "carla", "description": "Carla EV marketplace search via Next.js data API", "env": []string{}},
+			{"id": "ayvens", "description": "Ayvens used-car search (usedcars.ayvens.com) with DEKRA inspection report links", "env": []string{}},
 		},
 		"env": listSourcesEnv(),
 	}

@@ -37,3 +37,10 @@ func TestURLCarla(t *testing.T) {
 		t.Fatalf("got %q %q %v", s, id, ok)
 	}
 }
+
+func TestURLAyvens(t *testing.T) {
+	s, id, ok := urls.ParseListingURL("https://usedcars.ayvens.com/sv-se/koda-enyaq/tmbjc7ny2pf043314-skoda-enyaq.html")
+	if !ok || s != "ayvens" || id != "tmbjc7ny2pf043314-skoda-enyaq" {
+		t.Fatalf("got %q %q %v", s, id, ok)
+	}
+}

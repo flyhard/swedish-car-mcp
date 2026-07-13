@@ -88,7 +88,7 @@ func TestBlocketSearchMockTransport(t *testing.T) {
 
 func TestNormalizeSourcesDefault(t *testing.T) {
 	got := search.NormalizeSources(nil)
-	want := []string{"blocket", "wayke", "kvd", "tradera", "riddermark", "carla"}
+	want := []string{"blocket", "wayke", "kvd", "tradera", "riddermark", "carla", "ayvens"}
 	if len(got) != len(want) {
 		t.Fatalf("got %v", got)
 	}

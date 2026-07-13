@@ -13,6 +13,7 @@ var (
 	traderaItem     = regexp.MustCompile(`(?i)/item/(?P<id>\d+)`)
 	riddermarkCar   = regexp.MustCompile(`(?i)/kopa-bil/(?P<make>[^/]+)/(?P<id>[^/?#]+)`)
 	carlaCar        = regexp.MustCompile(`(?i)/bil/(?P<id>[^/?#]+)`)
+	ayvensCar       = regexp.MustCompile(`(?i)/sv-se/[^/]+/(?P<id>[^/?#]+)\.html`)
 )
 
 // ParseListingURL extracts source and listing id from a public URL.
@@ -56,6 +57,11 @@ func ParseListingURL(rawURL string) (source, id string, ok bool) {
 	if strings.HasSuffix(host, "carla.se") {
 		if m := carlaCar.FindStringSubmatch(path); len(m) >= 2 {
 			return "carla", m[1], true
+		}
+	}
+	if strings.HasSuffix(host, "usedcars.ayvens.com") || strings.HasSuffix(host, "ayvens.com") {
+		if m := ayvensCar.FindStringSubmatch(path); len(m) >= 2 {
+			return "ayvens", m[1], true
 		}
 	}
 	return "", "", false
