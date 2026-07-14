@@ -137,9 +137,28 @@ Release binaries are built with [GoReleaser](https://goreleaser.com/) on git tag
 
 ## MCP tools
 
-**bilmarknad-mcp:** `search_cars`, `get_listing`, `list_sources`
+**bilmarknad-mcp (v0.3):**
 
-**aviloo-mcp:** `extract_aviloo_pdf`, `lookup_aviloo_cert`, `list_aviloo_pdfs`
+| Tool | Purpose |
+|------|---------|
+| `search_cars` | Search Blocket, Wayke, Riddermark, Carla, Ayvens, Tradera, KVD |
+| `get_listing` | One listing by source+id, reg.nr, or URL |
+| `batch_get_listings` | Parallel fetch for a list of reg.nr / URLs |
+| `run_preset_scans` | Run all daily-update Blocket presets in one call |
+| `scrape_dealer_page` | Battery cert URLs, SoH %, ACC hints from dealer pages |
+| `list_sources` | Supported sources and env vars |
+
+**aviloo-mcp (v0.3):**
+
+| Tool | Purpose |
+|------|---------|
+| `extract_aviloo_pdf` | Parse AVILOO PDF in repo (alias of `extract_cert`) |
+| `extract_cert` | Unified AVILOO / DEKRA / SoHSCAN PDF parser |
+| `lookup_aviloo_cert` | Find cert by UUID or 32-char hex id |
+| `list_aviloo_pdfs` | List certificate PDFs in repo |
+| `fetch_bus_dekra` | BUS salesReportLink → SoH % + AVILOO PDF URL |
+| `download_cert_pdf` | Save cert PDF under `docs/modeller/{model}/annonser/{regnr}/` |
+| `hunt_soh` | Orchestrate SoH hunt for one reg.nr (repo → listing → BUS) |
 
 ## License
 

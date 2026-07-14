@@ -101,6 +101,26 @@ func FindPDFs() ([]string, error) {
 	return candidates, nil
 }
 
+// FindPDFsForRegnr returns PDFs whose path contains the registration number.
+func FindPDFsForRegnr(regnr string) ([]string, error) {
+	regnr = strings.ToUpper(strings.TrimSpace(regnr))
+	if regnr == "" {
+		return nil, nil
+	}
+	pdfs, err := FindPDFs()
+	if err != nil {
+		return nil, err
+	}
+	var matches []string
+	for _, pdf := range pdfs {
+		rel := strings.ToUpper(Rel(pdf))
+		if strings.Contains(rel, regnr) || strings.Contains(strings.ToUpper(filepath.Base(pdf)), regnr) {
+			matches = append(matches, pdf)
+		}
+	}
+	return matches, nil
+}
+
 // Rel returns a path relative to the repo root when possible.
 func Rel(abs string) string {
 	root, err := Root()

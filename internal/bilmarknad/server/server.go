@@ -4,12 +4,13 @@ import (
 	"context"
 	"strings"
 
+	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/dealers"
 	"github.com/flyhard/swedish-car-mcp/internal/bilmarknad/search"
 	"github.com/flyhard/swedish-car-mcp/internal/mcpjson"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const version = "0.2.0"
+const version = "0.3.0"
 
 var defaultService = &search.Service{}
 
@@ -41,6 +42,20 @@ type getListingInput struct {
 	ID        *string `json:"id"`
 	ListingID *string `json:"listing_id"`
 	URL       *string `json:"url"`
+}
+
+type batchGetListingsInput struct {
+	Listings []search.ListingRef `json:"listings" jsonschema:"listing references to fetch in parallel,required"`
+}
+
+type runPresetScansInput struct {
+	Presets         []string `json:"presets" jsonschema:"preset names from daily update; empty = all"`
+	Limit           *int     `json:"limit"`
+	UseBlocketProxy *bool    `json:"use_blocket_proxy"`
+}
+
+type scrapeDealerPageInput struct {
+	URL string `json:"url" jsonschema:"dealer listing URL (Riddermark, Ayvens, Din Bil, etc.),required"`
 }
 
 func textQuery(in searchCarsInput) *string {
@@ -108,6 +123,49 @@ func getListing(ctx context.Context, _ *mcp.CallToolRequest, in getListingInput)
 	})
 }
 
+func batchGetListings(ctx context.Context, _ *mcp.CallToolRequest, in batchGetListingsInput) (*mcp.CallToolResult, struct{}, error) {
+	items := defaultService.BatchGetListings(ctx, in.Listings)
+	found := 0
+	for _, item := range items {
+		if item != nil {
+			if f, ok := item["found"].(bool); ok && !f {
+				continue
+			}
+			found++
+		}
+	}
+	return mcpjson.TextResult(map[string]any{
+		"count":    len(items),
+		"found":    found,
+		"listings": items,
+	})
+}
+
+func runPresetScans(ctx context.Context, _ *mcp.CallToolRequest, in runPresetScansInput) (*mcp.CallToolResult, struct{}, error) {
+	useProxy := in.UseBlocketProxy != nil && *in.UseBlocketProxy
+	results, err := defaultService.RunPresetScans(ctx, in.Presets, in.Limit, useProxy)
+	if err != nil {
+		return mcpjson.ErrorResult(err.Error())
+	}
+	total := 0
+	for _, r := range results {
+		total += r.Count
+	}
+	return mcpjson.TextResult(map[string]any{
+		"preset_count": len(results),
+		"listing_count": total,
+		"scans": results,
+	})
+}
+
+func scrapeDealerPage(ctx context.Context, _ *mcp.CallToolRequest, in scrapeDealerPageInput) (*mcp.CallToolResult, struct{}, error) {
+	signals, err := dealers.ScrapePage(ctx, in.URL)
+	if err != nil {
+		return mcpjson.ErrorResult(err.Error())
+	}
+	return mcpjson.TextResult(signals)
+}
+
 func listSources(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, struct{}, error) {
 	return mcpjson.TextResult(defaultService.ListSources())
 }
@@ -117,6 +175,9 @@ func Run(ctx context.Context) error {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "bilmarknad", Version: version}, nil)
 	mcp.AddTool(srv, &mcp.Tool{Name: "search_cars", Description: "Search used cars across Swedish marketplaces. Use license_plate (or registration_number/regno) for direct lookup by registration number."}, searchCars)
 	mcp.AddTool(srv, &mcp.Tool{Name: "get_listing", Description: "Fetch one listing by source+id, license plate, or public listing URL."}, getListing)
+	mcp.AddTool(srv, &mcp.Tool{Name: "batch_get_listings", Description: "Fetch multiple listings in parallel by reg.nr, source+id, or URL."}, batchGetListings)
+	mcp.AddTool(srv, &mcp.Tool{Name: "run_preset_scans", Description: "Run daily-update Blocket scan presets (from scan-queries.md) in one call."}, runPresetScans)
+	mcp.AddTool(srv, &mcp.Tool{Name: "scrape_dealer_page", Description: "Scrape Riddermark, Ayvens, or other dealer pages for battery cert URLs, SoH, and ACC signals."}, scrapeDealerPage)
 	mcp.AddTool(srv, &mcp.Tool{Name: "list_sources", Description: "List supported sources and related environment variables."}, listSources)
 	return srv.Run(ctx, &mcp.StdioTransport{})
 }
